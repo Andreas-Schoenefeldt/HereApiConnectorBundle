@@ -54,8 +54,8 @@ Add the following configuration to your ```app/config/config.yml```:
 ```yml
 here_api_connector:
   timeout: 20
-  api_code: "%your-code%"
-  api_id: "%your-id%"
+  app_code: "%here_api_app_code%"
+  app_id: "%here_api_app_id%"
   lang: de
   country: DE
 ```

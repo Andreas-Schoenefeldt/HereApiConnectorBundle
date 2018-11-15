@@ -8,6 +8,10 @@ use Schoenef\HereApiConnectorBundle\DependencyInjection\Configuration;
 
 class HereApiConnector {
 
+    const COUNTRY_MAP = [
+        'DE' => 'DEU'
+    ];
+
     private $config;
 
     private $autocompleteClient;
@@ -45,37 +49,72 @@ class HereApiConnector {
     /**
      * this function will convert the HereApi result to geojson http://geojson.org/
      *
-     * @param $name
+     * @param $query
+     * @param array $options allows to define additional parameters to the call
      * @param array $filter the filter allows to reduce the results to certain types
      * @return array|bool
+     * @throws \Exception
      */
-    public function searchLocation ($name, $filter = []) {
-        $options = [];
+    public function searchLocation ($query, $options = [], $filter = []) {
 
-        $options['key'] = $this->key;
-
-        if ($this->lang) {
-            $options['lang'] = $this->lang;
-        }
+        $options = $this->getStandardOptions($options);
 
         if ($this->country) {
-            $options['country'] = $this->country;
+
+            $country = $this->country;
+
+            if (strlen($country) === 2 && !array_key_exists($country, self::COUNTRY_MAP)) {
+                throw new \Exception("Please use iso 3 country codes for the " . Configuration::KEY_COUNTRY . " parameter or create a PR with the apropriate mapping - $country can not be mapped at the moment.");
+            } else if (strlen($country) === 2) {
+                $country = self::COUNTRY_MAP[$country];
+            }
+
+            $options['country'] = $country;
         }
 
-        // autocomplete is only available for gisgraphy
-        if ($this->provider === Configuration::PROVIDER_GISGRAPHY && $this->autocomplete) {
-            $options['autocomplete'] = 'true';
-        }
+        $options['query'] = $query;
 
-        $options['q'] = $name;
-
-        // https://HereApi.com/api/1/geocode?q=berlin&locale=de&country=DE&autocomplete=true&key=7bd83ec8-fcda-45dc-957e-c1f66376ea1a&provider=gisgraphy
-        $response = $this->client->request('GET', '/api/1/geocode',['query' => $options]);
+        $response = $this->autocompleteClient->request('GET', 'suggest.json',['query' => $options]);
         if ($response->getStatusCode() == '200') {
-            return $this->filterResult(json_decode($response->getBody()->getContents(), true)['hits'], $filter);
+            return $this->filterResult(json_decode($response->getBody()->getContents(), true)['suggestions'],$filter);
         }
 
         return false;
+    }
+
+    /**
+     * pulls additional geo informtaion for a result
+     *
+     * @param array $result
+     * @return array
+     */
+    public function getLocationDetails (array $result) {
+        $options = $this->getStandardOptions();
+
+        $options['locationid'] = $result['properties']['id'];
+        $options['gen'] = 9; // hardcode to generation 9
+        $options['jsonattributes'] = 1; // to have a unified api - first letter is forced to be lowercase
+
+        $response = $this->geocoderClient->request('GET', 'geocode.json',['query' => $options]);
+
+        if ($response->getStatusCode() == '200') {
+
+            $extendedResult = json_decode($response->getBody()->getContents(), true)['response']['view'][0]['result'][0];
+
+            if ($extendedResult) {
+
+                $geo = $extendedResult['location']['displayPosition'];
+
+                // enrich the information with the lon/lat array
+                $result['geometry']['coordinates'] = [$geo['longitude'], $geo['latitude']];
+
+                // we take the much more beautifull label as well
+                $result['properties']['label'] = $extendedResult['location']['address']['label'];
+            }
+
+        }
+
+        return $result;
     }
 
 
@@ -120,30 +159,34 @@ class HereApiConnector {
                 default:
                     $geoEntry['properties'][$attr] = $val;
                     break;
-                case 'point':
-                    $geoEntry['geometry']['coordinates'] = [ $val['lng'], $val['lat'] ];
+                case 'locationId':
+                    $geoEntry['properties']['id'] = $val;
+                    break;
+                case 'address':
+                    foreach ($val as $addressKey => $addressVal) {
+                        $geoEntry['properties'][$addressKey] = $addressVal;
+
+                        if ($addressKey === 'city') {
+                            $geoEntry['properties']['name'] = $addressVal;
+                        }
+                    }
                     break;
             }
         }
 
-        if ($this->provider === Configuration::PROVIDER_GISGRAPHY) {
-            // gisgraphy can do autocomplete, but has a super limited result set
+        return $geoEntry;
+    }
 
-            if (!array_key_exists('name', $entry)) {
-                // this is a full auto complete set, let's see what we got
 
-                if (!array_key_exists('city', $entry)) {
-                    $geoEntry['properties']['name'] = $entry['street'];
-                    $geoEntry['properties']['city'] = $entry['street'];
-                    unset($geoEntry['properties']['street']);
+    protected function getStandardOptions ($options = []) {
+        $options['app_id'] = $this->app_id;
+        $options['app_code'] = $this->app_code;
 
-                }
-
-            }
-
+        if ($this->lang) {
+            $options['language'] = $this->lang;
         }
 
-        return $geoEntry;
+        return $options;
     }
 
 }
