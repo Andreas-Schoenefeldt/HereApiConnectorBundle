@@ -1,4 +1,4 @@
 services:
-  graph_hopper.connector:
+  here_api.connector:
     class: Schoenef\HereApiConnectorBundle\Service\HereApiConnector
     arguments: ['%here_api_connector%']
