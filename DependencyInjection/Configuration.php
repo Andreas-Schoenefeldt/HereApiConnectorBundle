@@ -9,6 +9,7 @@
 namespace Schoenef\HereApiConnectorBundle\DependencyInjection;
 
 
+use Schoenef\HereApiConnector\Service\HereApiConnector;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
@@ -23,12 +24,6 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
  * To learn more see {@link http://symfony.com/doc/current/cookbook/bundles/extension.html#cookbook-bundles-extension-config-class}
  */
 class Configuration implements ConfigurationInterface {
-    const KEY_TIMEOUT = 'timeout';
-    const KEY_APP_ID = 'app_id';
-    const KEY_APP_CODE = 'app_code';
-    const KEY_LANG = 'lang';
-    const KEY_COUNTRY = 'country';
-
     const CONFIG_NAMESPACE = 'here_api_connector';
 
     /**
@@ -42,11 +37,12 @@ class Configuration implements ConfigurationInterface {
 
         $rootNode
             ->children()
-            ->scalarNode(self::KEY_APP_ID)->isRequired()->end()
-            ->scalarNode(self::KEY_APP_CODE)->isRequired()->end()
-            ->scalarNode(self::KEY_COUNTRY)->end()
-            ->enumNode(self::KEY_LANG)->values(['en', 'de', 'fr', 'es', 'ru'])->defaultValue('en')->end()
-            ->integerNode(self::KEY_TIMEOUT)->defaultValue(20)->end()
+            ->scalarNode(HereApiConnector::KEY_APP_ID)->end()
+            ->scalarNode(HereApiConnector::KEY_APP_CODE)->end()
+            ->scalarNode(HereApiConnector::KEY_API_KEY)->end()
+            ->scalarNode(HereApiConnector::KEY_COUNTRY)->end()
+            ->enumNode(HereApiConnector::KEY_LANG)->values(['en', 'de', 'fr', 'es', 'ru'])->defaultValue('en')->end()
+            ->integerNode(HereApiConnector::KEY_TIMEOUT)->defaultValue(20)->end()
             ->end();
         return $treeBuilder;
     }

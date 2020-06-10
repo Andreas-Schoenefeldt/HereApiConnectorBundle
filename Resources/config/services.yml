@@ -1,4 +1,4 @@
 services:
   here_api.connector:
-    class: Schoenef\HereApiConnectorBundle\Service\HereApiConnector
+    class: Schoenef\HereApiConnector\Service\HereApiConnector
     arguments: ['%here_api_connector%']
